@@ -11,6 +11,9 @@
 
 package org.eclipse.rdf4j.common.iteration;
 
+import org.eclipse.rdf4j.common.reactor.FluxIteration;
+import reactor.core.publisher.Flux;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -82,20 +85,24 @@ public class Iterations {
 	 * @return a sequential {@link Stream} object which can be used to process the data from the source iteration.
 	 */
 	public static <T> Stream<T> stream(CloseableIteration<T> iteration) {
-		return StreamSupport
-				.stream(new CloseableIterationSpliterator<>(iteration), false)
-				.onClose(() -> {
-					try {
-						iteration.close();
-					} catch (RuntimeException e) {
-						throw e;
-					} catch (Exception e) {
-						if (e instanceof InterruptedException) {
-							Thread.currentThread().interrupt();
+		if (iteration instanceof FluxIteration) {
+			return iteration.flux().toStream();
+		} else {
+			return StreamSupport
+					.stream(new CloseableIterationSpliterator<>(iteration), false)
+					.onClose(() -> {
+						try {
+							iteration.close();
+						} catch (RuntimeException e) {
+							throw e;
+						} catch (Exception e) {
+							if (e instanceof InterruptedException) {
+								Thread.currentThread().interrupt();
+							}
+							throw new RuntimeException(e);
 						}
-						throw new RuntimeException(e);
-					}
-				});
+					});
+		}
 	}
 
 	/**
@@ -155,4 +162,12 @@ public class Iterations {
 		}
 	}
 
+	public static <T> Flux<T> flux(CloseableIteration<T> iter) {
+		if (iter instanceof FluxIteration) {
+			return iter.flux();
+		} else {
+			return Flux.fromIterable(() -> iter)
+					.doOnTerminate(iter::close);
+		}
+	}
 }

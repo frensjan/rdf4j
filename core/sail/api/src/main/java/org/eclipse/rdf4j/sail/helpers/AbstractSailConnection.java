@@ -343,10 +343,11 @@ public abstract class AbstractSailConnection implements SailConnection {
 			CloseableIteration<? extends BindingSet> iteration = null;
 			try {
 				iteration = evaluateInternal(tupleExpr, dataset, bindings, includeInferred);
-				if (assertsEnabled) {
-					iteration = new TupleExprWrapperIteration<>(iteration, tupleExpr);
-				}
-				return registerIteration(iteration);
+//				if (assertsEnabled) {
+//					iteration = new TupleExprWrapperIteration<>(iteration, tupleExpr);
+//				}
+//				return registerIteration(iteration);
+				return iteration;
 			} catch (Throwable t) {
 				if (iteration != null) {
 					iteration.close();

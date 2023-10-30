@@ -50,7 +50,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode({ Mode.AverageTime })
 @Fork(value = 1, jvmArgs = { "-Xms1G", "-Xmx1G" })
 //@Fork(value = 1, jvmArgs = {"-Xms1G", "-Xmx1G", "-XX:StartFlightRecording=delay=60s,duration=120s,filename=recording.jfr,settings=profile", "-XX:FlightRecorderOptions=samplethreads=true,stackdepth=1024", "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints"})
-@Measurement(iterations = 5)
+@Measurement(iterations = 50)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class QueryBenchmark {
 
@@ -154,8 +154,9 @@ public class QueryBenchmark {
 			return connection
 					.prepareTupleQuery(query4)
 					.evaluate()
-					.stream()
-					.count();
+					.flux()
+					.count()
+					.block();
 		}
 	}
 

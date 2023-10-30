@@ -17,15 +17,17 @@ import java.util.List;
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
 import org.eclipse.rdf4j.common.iteration.CloseableIteratorIteration;
 import org.eclipse.rdf4j.common.iteration.IterationWrapper;
+import org.eclipse.rdf4j.common.reactor.FluxIteration;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.QueryEvaluationException;
 import org.eclipse.rdf4j.query.TupleQueryResult;
+import reactor.core.publisher.Flux;
 
 /**
  * An iterating implementation of the {@link TupleQueryResult} interface.
  */
 public class IteratingTupleQueryResult extends IterationWrapper<BindingSet>
-		implements TupleQueryResult {
+		implements TupleQueryResult, FluxIteration<BindingSet> {
 
 	/*-----------*
 	 * Variables *
@@ -70,6 +72,11 @@ public class IteratingTupleQueryResult extends IterationWrapper<BindingSet>
 	/*---------*
 	 * Methods *
 	 *---------*/
+
+	@Override
+	public Flux<BindingSet> flux() {
+		return (Flux<BindingSet>) wrappedIter.flux();
+	}
 
 	@Override
 	public List<String> getBindingNames() throws QueryEvaluationException {

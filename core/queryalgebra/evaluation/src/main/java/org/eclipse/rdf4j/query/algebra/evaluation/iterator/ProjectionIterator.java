@@ -15,7 +15,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.eclipse.rdf4j.common.iteration.CloseableIteration;
-import org.eclipse.rdf4j.common.iteration.ConvertingIteration;
+import org.eclipse.rdf4j.common.iteration.Iterations;
+import org.eclipse.rdf4j.common.reactor.CloseableFluxIteration;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.MutableBindingSet;
@@ -27,16 +28,9 @@ import org.eclipse.rdf4j.query.algebra.ProjectionElemList;
 import org.eclipse.rdf4j.query.algebra.QueryModelNode;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryBindingSet;
 import org.eclipse.rdf4j.query.algebra.evaluation.impl.QueryEvaluationContext;
+import reactor.core.publisher.Flux;
 
-public class ProjectionIterator extends ConvertingIteration<BindingSet, BindingSet> {
-
-	/*-----------*
-	 * Constants *
-	 *-----------*/
-
-	private final BiConsumer<MutableBindingSet, BindingSet> projector;
-
-	private final Supplier<MutableBindingSet> maker;
+public class ProjectionIterator extends CloseableFluxIteration<BindingSet> {
 
 	/*--------------*
 	 * Constructors *
@@ -63,7 +57,20 @@ public class ProjectionIterator extends ConvertingIteration<BindingSet, BindingS
 
 	public ProjectionIterator(Projection projection, CloseableIteration<BindingSet> iter,
 			BindingSet parentBindings, QueryEvaluationContext context) throws QueryEvaluationException {
-		super(iter);
+		super(build(projection, iter, parentBindings, context));
+	}
+
+	/*---------*
+	 * Methods *
+	 *---------*/
+
+	private static Flux<BindingSet> build(Projection projection,
+										  CloseableIteration<BindingSet> iter,
+										  BindingSet parentBindings,
+										  QueryEvaluationContext context) {
+
+		Flux<BindingSet> source = Iterations.flux(iter);
+
 		ProjectionElemList projectionElemList = projection.getProjectionElemList();
 		boolean isOuterProjection = determineOuterProjection(projection);
 		boolean includeAllParentBindings = !isOuterProjection;
@@ -107,24 +114,27 @@ public class ProjectionIterator extends ConvertingIteration<BindingSet, BindingS
 			};
 		}
 
+		Supplier<MutableBindingSet> maker;
 		if (includeAllParentBindings) {
-			this.maker = () -> context.createBindingSet(parentBindings);
+			maker = () -> context.createBindingSet(parentBindings);
 		} else {
-			this.maker = context::createBindingSet;
+			maker = context::createBindingSet;
 		}
-		this.projector = consumer;
+
+		return build(source, maker, consumer);
 	}
 
-	private BiConsumer<MutableBindingSet, BindingSet> andThen(BiConsumer<MutableBindingSet, BindingSet> consumer,
-			BiConsumer<MutableBindingSet, BindingSet> next) {
-		if (consumer == null) {
-			return next;
-		} else {
-			return consumer.andThen(next);
-		}
+	private static Flux<BindingSet> build(Flux<BindingSet> source,
+										  Supplier<MutableBindingSet> maker,
+										  BiConsumer<MutableBindingSet, BindingSet> projector) {
+		return source.map(sourceBindings -> {
+			MutableBindingSet qbs = maker.get();
+			projector.accept(qbs, sourceBindings);
+			return qbs;
+		});
 	}
 
-	private boolean determineOuterProjection(QueryModelNode ancestor) {
+	private static boolean determineOuterProjection(QueryModelNode ancestor) {
 		while (ancestor.getParentNode() != null) {
 			ancestor = ancestor.getParentNode();
 			if (ancestor instanceof Projection || ancestor instanceof MultiProjection) {
@@ -137,13 +147,6 @@ public class ProjectionIterator extends ConvertingIteration<BindingSet, BindingS
 	/*---------*
 	 * Methods *
 	 *---------*/
-
-	@Override
-	protected BindingSet convert(BindingSet sourceBindings) throws QueryEvaluationException {
-		MutableBindingSet qbs = maker.get();
-		projector.accept(qbs, sourceBindings);
-		return qbs;
-	}
 
 	public static BindingSet project(ProjectionElemList projElemList, BindingSet sourceBindings,
 			BindingSet parentBindings) {

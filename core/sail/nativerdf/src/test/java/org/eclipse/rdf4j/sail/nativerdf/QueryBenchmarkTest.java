@@ -11,18 +11,14 @@
 
 package org.eclipse.rdf4j.sail.nativerdf;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-
 import org.apache.commons.io.IOUtils;
 import org.eclipse.rdf4j.common.iteration.Iterations;
 import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.rio.RDFFormat;
@@ -30,168 +26,178 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * @author Håvard Ottestad
  */
 public class QueryBenchmarkTest {
 
-	private static SailRepository repository;
+    private static SailRepository repository;
 
-	private static final String query1;
-	private static final String query2;
-	private static final String query3;
-	private static final String query4;
-	private static final String query5;
+    private static final String query1;
+    private static final String query2;
+    private static final String query3;
+    private static final String query4;
+    private static final String query5;
 
-	static {
-		try {
-			query1 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query1.qr"), StandardCharsets.UTF_8);
-			query2 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query2.qr"), StandardCharsets.UTF_8);
-			query3 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query3.qr"), StandardCharsets.UTF_8);
-			query4 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query4.qr"), StandardCharsets.UTF_8);
-			query5 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query5.qr"), StandardCharsets.UTF_8);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
+    static {
+        try {
+            query1 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query1.qr"), StandardCharsets.UTF_8);
+            query2 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query2.qr"), StandardCharsets.UTF_8);
+            query3 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query3.qr"), StandardCharsets.UTF_8);
+            query4 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query4.qr"), StandardCharsets.UTF_8);
+            query5 = IOUtils.toString(getResourceAsStream("benchmarkFiles/query5.qr"), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-	static List<Statement> statementList;
+    static List<Statement> statementList;
 
-	@BeforeAll
-	public static void beforeClass(@TempDir File dataDir) throws IOException {
+    @BeforeAll
+    public static void beforeClass(@TempDir File dataDir) throws IOException {
 
-		repository = new SailRepository(new NativeStore(dataDir, "spoc,ospc,psoc"));
+        repository = new SailRepository(new NativeStore(dataDir, "spoc,ospc,psoc"));
 
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.NONE);
-			connection.add(getResourceAsStream("benchmarkFiles/datagovbe-valid.ttl"), "", RDFFormat.TURTLE);
-			connection.commit();
-		}
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.NONE);
+            connection.add(getResourceAsStream("benchmarkFiles/datagovbe-valid.ttl"), "", RDFFormat.TURTLE);
+            connection.commit();
+        }
 
-		try (SailRepositoryConnection connection = repository.getConnection()) {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
 
-			statementList = Iterations.asList(connection.getStatements(null, RDF.TYPE, null, false));
-		}
+            statementList = Iterations.asList(connection.getStatements(null, RDF.TYPE, null, false));
+        }
 
-		System.gc();
+        System.gc();
 
-	}
+    }
 
-	private static InputStream getResourceAsStream(String name) {
-		return QueryBenchmarkTest.class.getClassLoader().getResourceAsStream(name);
-	}
+    private static InputStream getResourceAsStream(String name) {
+        return QueryBenchmarkTest.class.getClassLoader().getResourceAsStream(name);
+    }
 
-	@AfterAll
-	public static void afterClass() {
-		repository.shutDown();
-		repository = null;
-		statementList = null;
-	}
+    @AfterAll
+    public static void afterClass() {
+        repository.shutDown();
+        repository = null;
+        statementList = null;
+    }
 
-	@Test
-	public void groupByQuery() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			long count = connection
-					.prepareTupleQuery(query1)
-					.evaluate()
-					.stream()
-					.count();
-			System.out.println(count);
-		}
-	}
+    @Test
+    public void groupByQuery() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            long count = connection
+                    .prepareTupleQuery(query1)
+                    .evaluate()
+                    .stream()
+                    .count();
+            System.out.println(count);
+        }
+    }
 
-	@Test
-	public void complexQuery() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			long count = connection
-					.prepareTupleQuery(query4)
-					.evaluate()
-					.stream()
-					.count();
-			System.out.println(count);
-		}
-	}
+    @Test
+//	@RepeatedTest(10000)
+    public void complexQuery() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            TupleQueryResult result = connection
+                    .prepareTupleQuery(query4)
+                    .evaluate();
+            Flux<BindingSet> flux = result.flux();
+            Mono<Long> mono = flux.count();
+            Long count = mono.block();
+            System.out.println(count);
+        }
+    }
 
-	@Test
-	public void distinctPredicatesQuery() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			long count = connection
-					.prepareTupleQuery(query5)
-					.evaluate()
-					.stream()
-					.count();
-			System.out.println(count);
-		}
-	}
+    @Test
+    public void distinctPredicatesQuery() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            long count = connection
+                    .prepareTupleQuery(query5)
+                    .evaluate()
+                    .stream()
+                    .count();
+            System.out.println(count);
+        }
+    }
 
-	@Test
-	public void removeByQuery() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.NONE);
-			connection.remove((Resource) null, RDF.TYPE, null);
-			connection.commit();
-			connection.begin(IsolationLevels.NONE);
-			connection.add(statementList);
-			connection.commit();
-		}
-		hasStatement();
+    @Test
+    public void removeByQuery() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.NONE);
+            connection.remove((Resource) null, RDF.TYPE, null);
+            connection.commit();
+            connection.begin(IsolationLevels.NONE);
+            connection.add(statementList);
+            connection.commit();
+        }
+        hasStatement();
 
-	}
+    }
 
-	@Test
-	public void removeByQueryReadCommitted() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.READ_COMMITTED);
-			connection.remove((Resource) null, RDF.TYPE, null);
-			connection.commit();
-			connection.begin(IsolationLevels.READ_COMMITTED);
-			connection.add(statementList);
-			connection.commit();
-		}
-		hasStatement();
+    @Test
+    public void removeByQueryReadCommitted() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.READ_COMMITTED);
+            connection.remove((Resource) null, RDF.TYPE, null);
+            connection.commit();
+            connection.begin(IsolationLevels.READ_COMMITTED);
+            connection.add(statementList);
+            connection.commit();
+        }
+        hasStatement();
 
-	}
+    }
 
-	@Test
-	public void simpleUpdateQueryIsolationReadCommitted() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.READ_COMMITTED);
-			connection.prepareUpdate(query2).execute();
-			connection.commit();
-		}
+    @Test
+    public void simpleUpdateQueryIsolationReadCommitted() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.READ_COMMITTED);
+            connection.prepareUpdate(query2).execute();
+            connection.commit();
+        }
 
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.READ_COMMITTED);
-			connection.prepareUpdate(query3).execute();
-			connection.commit();
-		}
-		hasStatement();
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.READ_COMMITTED);
+            connection.prepareUpdate(query3).execute();
+            connection.commit();
+        }
+        hasStatement();
 
-	}
+    }
 
-	@Test
-	public void simpleUpdateQueryIsolationNone() {
+    @Test
+    public void simpleUpdateQueryIsolationNone() {
 
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.NONE);
-			connection.prepareUpdate(query2).execute();
-			connection.commit();
-		}
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.NONE);
+            connection.prepareUpdate(query2).execute();
+            connection.commit();
+        }
 
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			connection.begin(IsolationLevels.NONE);
-			connection.prepareUpdate(query3).execute();
-			connection.commit();
-		}
-		hasStatement();
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            connection.begin(IsolationLevels.NONE);
+            connection.prepareUpdate(query3).execute();
+            connection.commit();
+        }
+        hasStatement();
 
-	}
+    }
 
-	private boolean hasStatement() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			return connection.hasStatement(RDF.TYPE, RDF.TYPE, RDF.TYPE, true);
-		}
-	}
+    private boolean hasStatement() {
+        try (SailRepositoryConnection connection = repository.getConnection()) {
+            return connection.hasStatement(RDF.TYPE, RDF.TYPE, RDF.TYPE, true);
+        }
+    }
 
 }

@@ -25,6 +25,7 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.FOAF;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
+import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Query;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.explanation.Explanation;
@@ -442,29 +443,29 @@ public class QueryPlanRetrievalTest {
 			String expected = "Slice (limit=1) (resultSizeActual=1)\n" +
 					"   LeftJoin (LeftJoinIterator) (resultSizeActual=1)\n" +
 					"   ├── Join (JoinIterator) (resultSizeActual=1) [left]\n" +
-					"   │  ╠══ StatementPattern (costEstimate=1, resultSizeEstimate=4, resultSizeActual=3) [left]\n" +
+					"   │  ╠══ StatementPattern (costEstimate=1, resultSizeEstimate=4, resultSizeActual=4) [left]\n" +
 					"   │  ║     s: Var (name=a)\n" +
 					"   │  ║     p: Var (name=_const_f5e5585a_uri, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#type, anonymous)\n"
 					+
 					"   │  ║     o: Var (name=d)\n" +
-					"   │  ╚══ Filter (resultSizeActual=1) [right]\n" +
+					"   │  ╚══ Filter (resultSizeActual=2) [right]\n" +
 					"   │     ├── Compare (!=)\n" +
 					"   │     │     Var (name=c)\n" +
 					"   │     │     Var (name=d)\n" +
-					"   │     └── Join (HashJoinIteration) (resultSizeActual=4)\n" +
-					"   │        ╠══ Filter (resultSizeActual=4) [left]\n" +
+					"   │     └── Join (HashJoinIteration) (resultSizeActual=6)\n" +
+					"   │        ╠══ Filter (resultSizeActual=6) [left]\n" +
 					"   │        ║  ├── Compare (!=)\n" +
 					"   │        ║  │     Var (name=c)\n" +
 					"   │        ║  │     ValueConstant (value=\"<\")\n" +
-					"   │        ║  └── StatementPattern (costEstimate=2, resultSizeEstimate=4, resultSizeActual=4)\n" +
+					"   │        ║  └── StatementPattern (costEstimate=2, resultSizeEstimate=4, resultSizeActual=6)\n" +
 					"   │        ║        s: Var (name=a)\n" +
 					"   │        ║        p: Var (name=_const_f5e5585a_uri, value=http://www.w3.org/1999/02/22-rdf-syntax-ns#type, anonymous)\n"
 					+
 					"   │        ║        o: Var (name=c)\n" +
-					"   │        ╚══ LeftJoin (new scope) (BadlyDesignedLeftJoinIterator) (costEstimate=5, resultSizeEstimate=12, resultSizeActual=3) [right]\n"
+					"   │        ╚══ LeftJoin (new scope) (BadlyDesignedLeftJoinIterator) (costEstimate=5, resultSizeEstimate=12, resultSizeActual=4) [right]\n"
 					+
-					"   │           ├── SingletonSet (resultSizeActual=3) [left]\n" +
-					"   │           └── StatementPattern (resultSizeEstimate=12, resultSizeActual=36) [right]\n" +
+					"   │           ├── SingletonSet (resultSizeActual=4) [left]\n" +
+					"   │           └── StatementPattern (resultSizeEstimate=12, resultSizeActual=48) [right]\n" +
 					"   │                 s: Var (name=d)\n" +
 					"   │                 p: Var (name=e)\n" +
 					"   │                 o: Var (name=f)\n" +

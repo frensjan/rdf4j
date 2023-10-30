@@ -522,6 +522,11 @@
 				<artifactId>guava-testlib</artifactId>
 				<version>${guava.version}</version>
 			</dependency>
+			<dependency>
+				<groupId>io.projectreactor</groupId>
+				<artifactId>reactor-core</artifactId>
+				<version>3.5.11</version>
+			</dependency>
 			<!-- Logging: SLF4J and logback -->
 			<dependency>
 				<groupId>org.slf4j</groupId>

@@ -11,6 +11,8 @@
 
 package org.eclipse.rdf4j.common.iteration;
 
+import reactor.core.publisher.Flux;
+
 import java.util.Iterator;
 import java.util.stream.Stream;
 
@@ -32,6 +34,10 @@ import java.util.stream.Stream;
  *
  */
 public interface CloseableIteration<E> extends Iterator<E>, AutoCloseable {
+
+	default Flux<E> flux() {
+		return Iterations.flux(this);
+	}
 
 	/**
 	 * Convert the results to a Java 8 Stream.
