@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -29,8 +30,10 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.io.StringReader;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
@@ -65,6 +68,7 @@ import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Union;
 import org.eclipse.rdf4j.query.algebra.UpdateExpr;
 import org.eclipse.rdf4j.query.algebra.Var;
+import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.parser.ParsedBooleanQuery;
 import org.eclipse.rdf4j.query.parser.ParsedGraphQuery;
 import org.eclipse.rdf4j.query.parser.ParsedQuery;
@@ -192,6 +196,7 @@ public class SPARQLParserTest {
 		UpdateExpr expr = exprs.get(0);
 		assertTrue(expr instanceof Modify);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		Modify m = (Modify) expr;
 		TupleExpr whereClause = m.getWhereExpr();
@@ -209,7 +214,9 @@ public class SPARQLParserTest {
 		// test that the parser correctly parses the object value as an integer, instead of as a decimal.
 		String query = "select ?Concept where { ?Concept a 1. ?Concept2 a 1. } ";
 		ParsedTupleQuery q = (ParsedTupleQuery) parser.parseQuery(query, null);
-		verifySerializable(q.getTupleExpr());
+		QueryModelNode tupleExpr = q.getTupleExpr();
+		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 		// all we're verifying is that the query is parsed without error. If it doesn't parse as integer but as a
 		// decimal, the
@@ -226,6 +233,7 @@ public class SPARQLParserTest {
 		TupleExpr tupleExpr = q.getTupleExpr();
 		assertTrue(tupleExpr instanceof QueryRoot);
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 		tupleExpr = ((QueryRoot) tupleExpr).getArg();
 		assertNotNull(tupleExpr);
 		assertTrue(tupleExpr instanceof Projection);
@@ -241,6 +249,7 @@ public class SPARQLParserTest {
 
 		TupleExpr te = q.getTupleExpr();
 		verifySerializable(te);
+		verifyParentChildReferencesConsistent(te);
 		assertTrue(te instanceof QueryRoot);
 		te = ((QueryRoot) te).getArg();
 		assertNotNull(te);
@@ -257,6 +266,7 @@ public class SPARQLParserTest {
 		assertNotNull(query);
 		TupleExpr te = query.getTupleExpr();
 		verifySerializable(te);
+		verifyParentChildReferencesConsistent(te);
 		assertTrue(te instanceof QueryRoot);
 		te = ((QueryRoot) te).getArg();
 		assertTrue(te instanceof Projection);
@@ -280,6 +290,7 @@ public class SPARQLParserTest {
 
 		TupleExpr te = query.getTupleExpr();
 		verifySerializable(te);
+		verifyParentChildReferencesConsistent(te);
 		assertThat(te).isInstanceOf(QueryRoot.class);
 		te = ((QueryRoot) te).getArg();
 		assertThat(te).isInstanceOf(Projection.class);
@@ -301,6 +312,7 @@ public class SPARQLParserTest {
 		ParsedQuery q = parser.parseQuery(qb.toString(), null);
 		TupleExpr te = q.getTupleExpr();
 		verifySerializable(te);
+		verifyParentChildReferencesConsistent(te);
 		assertTrue(te instanceof QueryRoot);
 		te = ((QueryRoot) te).getArg();
 		assertNotNull(te);
@@ -328,6 +340,7 @@ public class SPARQLParserTest {
 		ParsedQuery q = parser.parseQuery(qb.toString(), null);
 		TupleExpr te = q.getTupleExpr();
 		verifySerializable(te);
+		verifyParentChildReferencesConsistent(te);
 		assertTrue(te instanceof QueryRoot);
 		te = ((QueryRoot) te).getArg();
 		assertNotNull(te);
@@ -364,6 +377,7 @@ public class SPARQLParserTest {
 		// parsing should not throw exception
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 	}
 
@@ -376,6 +390,7 @@ public class SPARQLParserTest {
 		// parsing should not throw exception
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 	}
 
@@ -389,6 +404,7 @@ public class SPARQLParserTest {
 		// parsing should not throw exception
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 	}
 
@@ -400,6 +416,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 		assertTrue(tupleExpr instanceof QueryRoot);
 		tupleExpr = ((QueryRoot) tupleExpr).getArg();
 
@@ -421,6 +438,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 		assertTrue(tupleExpr instanceof QueryRoot);
 		tupleExpr = ((QueryRoot) tupleExpr).getArg();
 		assertTrue(tupleExpr instanceof Slice);
@@ -443,6 +461,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 		assertTrue(tupleExpr instanceof QueryRoot);
 		tupleExpr = ((QueryRoot) tupleExpr).getArg();
 		assertTrue(tupleExpr instanceof Slice);
@@ -479,6 +498,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 	}
 
@@ -494,6 +514,7 @@ public class SPARQLParserTest {
 					+ "} GROUP BY ?s ?o";
 			var tupleExpr = parser.parseQuery(query, null).getTupleExpr();
 			verifySerializable(tupleExpr);
+			verifyParentChildReferencesConsistent(tupleExpr);
 			assertTrue(tupleExpr instanceof QueryRoot);
 			tupleExpr = ((QueryRoot) tupleExpr).getArg();
 			assertTrue(tupleExpr instanceof Projection);
@@ -526,6 +547,7 @@ public class SPARQLParserTest {
 					+ "} GROUP BY ?s \nHAVING (rj:x(distinct ?o) > 50) ";
 			var tupleExpr = parser.parseQuery(query, null).getTupleExpr();
 			verifySerializable(tupleExpr);
+			verifyParentChildReferencesConsistent(tupleExpr);
 			assertTrue(tupleExpr instanceof QueryRoot);
 			tupleExpr = ((QueryRoot) tupleExpr).getArg();
 			assertTrue(tupleExpr instanceof Projection);
@@ -564,6 +586,7 @@ public class SPARQLParserTest {
 					+ "} GROUP BY ?s ?o";
 			var tupleExpr = parser.parseQuery(query, null).getTupleExpr();
 			verifySerializable(tupleExpr);
+			verifyParentChildReferencesConsistent(tupleExpr);
 			assertTrue(tupleExpr instanceof QueryRoot);
 			tupleExpr = ((QueryRoot) tupleExpr).getArg();
 			assertTrue(tupleExpr instanceof Projection);
@@ -637,6 +660,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -673,6 +697,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -686,6 +711,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -699,6 +725,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -711,6 +738,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -723,6 +751,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -735,6 +764,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -748,6 +778,7 @@ public class SPARQLParserTest {
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	@Test
@@ -767,6 +798,7 @@ public class SPARQLParserTest {
 		assertInstanceOf(ParsedGraphQuery.class, parsedQuery);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 		ParsedGraphQuery parsedGraphQuery = (ParsedGraphQuery) parsedQuery;
 
@@ -787,6 +819,7 @@ public class SPARQLParserTest {
 		assertInstanceOf(ParsedGraphQuery.class, parsedQuery);
 		TupleExpr tupleExpr = parsedQuery.getTupleExpr();
 		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 
 		ParsedGraphQuery parsedGraphQuery = (ParsedGraphQuery) parsedQuery;
 
@@ -819,6 +852,7 @@ public class SPARQLParserTest {
 		assertEquals(1, parsedUpdate.getUpdateExprs().size());
 		UpdateExpr expr = parsedUpdate.getUpdateExprs().get(0);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		assertInstanceOf(InsertData.class, expr);
 		Model parse = Rio.parse(new StringReader(((InsertData) expr).getDataBlock()), RDFFormat.TURTLE);
@@ -846,6 +880,7 @@ public class SPARQLParserTest {
 		assertEquals(1, parsedUpdate.getUpdateExprs().size());
 		UpdateExpr expr = parsedUpdate.getUpdateExprs().get(0);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		assertInstanceOf(InsertData.class, expr);
 		Model parse = Rio.parse(new StringReader(((InsertData) expr).getDataBlock()), RDFFormat.TURTLE);
@@ -872,6 +907,7 @@ public class SPARQLParserTest {
 		assertEquals(1, parsedUpdate.getUpdateExprs().size());
 		UpdateExpr expr = parsedUpdate.getUpdateExprs().get(0);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		assertInstanceOf(InsertData.class, expr);
 		Model parse = Rio.parse(new StringReader(((InsertData) expr).getDataBlock()), RDFFormat.TURTLE);
@@ -899,6 +935,7 @@ public class SPARQLParserTest {
 		assertEquals(1, parsedUpdate.getUpdateExprs().size());
 		UpdateExpr expr = parsedUpdate.getUpdateExprs().get(0);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		assertInstanceOf(DeleteData.class, expr);
 		Model parse = Rio.parse(new StringReader(((DeleteData) expr).getDataBlock()), RDFFormat.TURTLE);
@@ -926,6 +963,7 @@ public class SPARQLParserTest {
 		assertEquals(1, parsedUpdate.getUpdateExprs().size());
 		UpdateExpr expr = parsedUpdate.getUpdateExprs().get(0);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		assertInstanceOf(DeleteData.class, expr);
 		Model parse = Rio.parse(new StringReader(((DeleteData) expr).getDataBlock()), RDFFormat.TURTLE);
@@ -952,6 +990,7 @@ public class SPARQLParserTest {
 		assertEquals(1, parsedUpdate.getUpdateExprs().size());
 		UpdateExpr expr = parsedUpdate.getUpdateExprs().get(0);
 		verifySerializable(expr);
+		verifyParentChildReferencesConsistent(expr);
 
 		assertInstanceOf(DeleteData.class, expr);
 		Model parse = Rio.parse(new StringReader(((DeleteData) expr).getDataBlock()), RDFFormat.TURTLE);
@@ -973,7 +1012,9 @@ public class SPARQLParserTest {
 
 		// should parse without error
 		ParsedQuery parsedQuery = parser.parseQuery(query, null);
-		verifySerializable(parsedQuery.getTupleExpr());
+		QueryModelNode tupleExpr = parsedQuery.getTupleExpr();
+		verifySerializable(tupleExpr);
+		verifyParentChildReferencesConsistent(tupleExpr);
 	}
 
 	private AggregateFunctionFactory buildDummyFactory() {
@@ -1019,6 +1060,27 @@ public class SPARQLParserTest {
 			}
 		} catch (IOException | ClassNotFoundException e) {
 			throw new RuntimeException(e);
+		}
+	}
+
+	private void verifyParentChildReferencesConsistent(QueryModelNode node) {
+		try {
+			node.visit(new AbstractQueryModelVisitor<Exception>() {
+				private final Deque<QueryModelNode> ancestors = new LinkedList<>();
+
+				@Override
+				protected void meetNode(QueryModelNode node) throws Exception {
+					QueryModelNode expected = ancestors.peekLast();
+					QueryModelNode actual = node.getParentNode();
+					assertSame(expected, actual,
+							() -> String.format("Expected parent of %s to be %s, not %s", node, expected, actual));
+					ancestors.addLast(node);
+					node.visitChildren(this);
+					ancestors.removeLast();
+				}
+			});
+		} catch (Exception e) {
+			fail(e);
 		}
 	}
 }
